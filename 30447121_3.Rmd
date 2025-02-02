@@ -1,0 +1,783 @@
+---
+title: "Programmierung für Statistische Datenanalyse - Übungsblatt 3"
+# abstract: "A brief summary of our ideas."
+# keywords: "Statistics, Regression, Forecasting"
+course: Programmierung für Statistische Datenanalyse (Prof. Dr. Buchwitz)
+supervisor: Prof. Dr. Buchwitz
+city: Meschede
+author:
+- familyname: Baars
+  othernames: Louis
+  address: "MatNr: 30447121"
+  qualifications: "Data Science (M. Sc., 1. Semester)"
+  email: baars.louis@fh-swf.de
+german: true # German Dummy Text
+lang: de-de   # Text Language: en-gb, en-us, de-de
+toc: true     # Table of Contents
+lot: false    # List of Tables
+lof: false    # List of Figures
+bibliography: references.bib
+biblio-style: authoryear-comp
+blind: false
+cover: true
+checklist: false
+output:
+  fhswf::seminarpaper:
+    fig_caption: yes
+    fig_height: 5
+    fig_width: 8
+    keep_tex: no
+    number_sections: yes
+    citation_package: biblatex
+knit: fhswf::render_seminarpaper
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache=FALSE, messages=FALSE, warning=FALSE, 
+                      attr.source='.numberLines', singlespacing = TRUE)
+fhswf::fhswf_hooks()
+
+# Load Packages
+library(fhswf)
+```
+
+```{r, echo=T}
+# Load Packages
+library(ggplot2)
+library(dplyr)
+library(microbenchmark)
+```
+
+# Aufgabe 1
+
+```{r, echo=T}
+# Erstellen der Listen
+listenelement_1 <- c("kitchen", "bathroom1", "bathroom2", "bedroom1", 
+                     "bedroom2", "bedroom3", "study", "living_room", 
+                     "utility_room")
+listenelement_2 <- c("15", "10", "5", "12", "13", "14", "9", "25", "10")
+listenelement_4 <- c(0, 1, 2, 0, 0, 2, 0, 0, 1, 1, 0, 2, 0, 0, 1, 1, 0, 
+                     2, 0, 0, 1, 0, 1, 4, 0, 1, 2)
+```
+
+## 1 a)
+```{r, echo=T}
+# Ergänzen von listenelement_3
+listenelement_3 <- 300
+
+# Transformation von listenelement_4 in eine Matrix mit 
+# Spalten- und Zeilenbenennung
+listenelement_4 <- matrix(listenelement_4, 
+                          nrow = 9, 
+                          byrow = TRUE, 
+                          dimnames = list(listenelement_1, 
+                                          c("balcony",
+                                            "terrace",
+                                            "number_windows")))
+
+# Erstellen von Listenelement 5 -> Boolean Variable mit dem Wert true
+listenelement_5 <- TRUE
+
+# Erstellen von Listenelement 6 -> Boolean Variable mit dem Wert false
+listenelement_6 <- FALSE
+
+# Erstellen von Listenelement 7 -> Liste mit Informationen über die Küche
+listenelement_7 <- list(fitted_kitchen = "available", 
+                       electrical_appliance = 2018)
+
+# Zusammenfügen aller obigen Elemente
+house <- list(
+  rooms = listenelement_1,
+  squaremetre = listenelement_2,
+  site_squaremetre = listenelement_3,
+  listenelement_4,
+  garden = listenelement_5,
+  cellar = listenelement_6,
+  kitchen = listenelement_7
+)
+
+# Ausgabe
+print(house)
+
+```
+
+
+## 1 b)
+```{r, echo=T}
+# Index für "bedroom2" in der Liste `rooms` suchen
+index_bedroom2 <- match("bedroom2", house$rooms)
+
+# Abfrage der Größe von "bedroom2" aus der Liste `squaremetre` über den Index
+size_bedroom2 <- as.numeric(house$squaremetre[index_bedroom2])
+size_bedroom2
+```
+Das zweite Schlafzimmer hat eine Größe von 13 Quadratmetern.
+
+## 1 c)
+```{r, echo=T}
+# Umbenennen des 4. Listenelements in `house`
+names(house)[4] <- "entrance"
+
+```
+
+## 1 d)
+```{r, echo=T}
+# Umwandeln von house$entrance in einen Dataframe
+df_entrance <- as.data.frame(house$entrance)
+df_entrance
+```
+
+## 1 d.1)
+```{r, echo=T}
+# Filtern von Räumen mit zwei Fenstern und einer Terrasse
+df_entrance %>%
+  filter(number_windows == 2, terrace == 1) %>% # Filter anwenden
+  nrow() # Zeilen zählen
+```
+Es gibt zwei Räume mit jeweils zwei Fenstern und einer Terrasse.
+
+## 1 d.2)
+```{r, echo=T}
+# Filtern von Räumen mit zwei Fenstern und einer Terrasse
+df_entrance %>%
+  filter(number_windows == 2, terrace == 0) %>% 
+  nrow()
+
+```
+Es gibt drei Räume mit jeweils zwei Fenstern und einer Terrasse.
+
+## 1 d.3)
+```{r, echo=T}
+df_entrance %>%
+  filter(number_windows >= 1 & (balcony == 1 | terrace == 1)) %>%
+  nrow()
+
+```
+Es gibt fünf Räume mit mindestens einem Fenster und einem Zugang zur Terrasse oder zum Balkon.
+
+## 1 d.4)
+```{r, echo=T}
+df_entrance %>%
+  filter(balcony == 1 | terrace == 1) %>%
+  group_by(number_windows) %>% # Gruppieren nach der Anzahl an Fenstern
+  summarise(anzahl = n()) # Summieren der Räume
+
+```
+Es existieren vier Räume, die zwei Fenster haben und mindestens einen Zugang zu Balkon oder Terrasse haben und ein Raum, der vier Fenster hat und mindestens einen zugang zu Balkon oder Terrasse. 
+
+# Aufgabe 2
+```{r, echo=T}
+# Erstellen des Data Frames
+best_running_results <- 
+  data.frame("runnerName" = c("A.B.", "A.D.", "B.E.", 
+                              "B.Z.", "C.E.", "G.L.", 
+                              "G.S.", "M.E.", "M.M.", 
+                              "M.N.", "S.S.", "S.L.", 
+                              "T.A.", "T.Al.", "T.R.", 
+                              "U.B.", "V.U."),
+             "time" = c(41.20, 46.18, 44.20, 43.45, 46.42, 
+                        48.45, 51.13, 41.54, 54.44, 56.44,
+                        57.01, 47.56, 51.15, 49.32, 48.12,
+                        50.49, 51.20),
+             "man" = c(1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1,
+                       0, 1, 1, 0, 1),
+             "woman" = c(0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 
+                         0, 1, 0, 0, 1, 0),
+             "achievement" = c("A", "C", "B", "B", "C",
+                               "D", "E", "A", "E", "E",
+                               "E", "C", "E", "D", "D",
+                               "D", "E"))
+best_running_results
+```
+
+## 2 a.1)
+```{r, echo=T}
+# Ohne dplyr:
+# Ermittlung der Häufigkeiten in der Kategorie achievement
+no_dplyr <- table(best_running_results$achievement) 
+no_dplyr
+
+# Mit dplyr:
+# Zählen der Rows in der Kategorie achievement
+dplyr <- best_running_results %>%
+  count(achievement) # 
+dplyr
+```
+Es gibt 2 Läufer in Leistungskategorie A, 2 Läufer in Leistungskategorie B, 3 Läufer in Leistungskategorie C, 4 Läufer in Leistungskategorie D und 6 Läufer in Leistungskategorie E.
+
+```{r, echo=T}
+# Überprüfung auf Gleichheit
+identical(no_dplyr, dplyr)
+
+class(no_dplyr)
+class(dplyr)
+```
+- Ohne dplyr: "table" liefert ein Objekt vom Typ „table“.  
+- Mit dplyr: "count" liefert ein Objekt (Data Frame).  
+Es werden unterschiedliche Datentypen erzeugt und das Ergebnis ist nicht identisch.
+
+## 2 a.2)
+```{r, echo=T}
+# Ohne dplyr:
+no_dplyr <- data.frame(
+  # Summiert die Spalte 'woman'
+  total_women = sum(best_running_results$woman),
+  # Summiert die Spalte 'man'
+  total_men = sum(best_running_results$man))
+no_dplyr
+
+# Mit dplyr:
+dplyr <- best_running_results %>%
+  summarise(
+    # Summiert die Spalte 'woman'
+    total_women = sum(woman),
+    # Summiert die Spalte 'man'
+    total_men   = sum(man)
+  )
+dplyr
+```
+Unter den Läufern sind 8 Frauen und 9 Männer.
+
+```{r, echo=T}
+# Überprüfung auf Gleichheit
+identical(no_dplyr, dplyr)
+
+class(no_dplyr)
+class(dplyr)
+```
+Die Varianten sind identisch.
+
+## 2 a.3)
+```{r, echo=T}
+# Ohne dplyr:
+# order sortiert das Dataframe anhand der 'time'‐Spalte
+# in aufsteigender Reihenfolge
+no_dplyr <- best_running_results[order(best_running_results$time), ]
+no_dplyr
+
+# Mit dplyr:
+# arrange ist das gegenstück zu order in dplyr
+dplyr<- best_running_results %>%
+  arrange(time)
+dplyr
+```
+
+
+```{r, echo=T}
+# Überprüfung auf Gleichheit
+identical(no_dplyr, dplyr)
+
+class(no_dplyr)
+class(dplyr)
+```
+Beide Varianten liefern zwar Dataframes, aber die Zeilennamen/Indices unterscheiden sich.  
+Die Varianten sind nicht identisch.
+
+## 2 a.4)
+```{r, echo=T}
+# Ohne dplyr:
+# Über subset werden rows ausgewählt, bei denen 'achievement' A,B,C oder D ist
+subset_AD <- subset(best_running_results, achievement %in% c("A","B","C","D"))
+no_dplyr <- c(women_AD = sum(subset_AD$woman), men_AD = sum(subset_AD$man))
+no_dplyr
+
+# Mit dplyr:
+dplyr <- best_running_results %>%
+  # Filtert Kategorien A, B, C, D
+  filter(achievement %in% c("A","B","C","D")) %>%
+  summarise(
+    women_AD = sum(woman),
+    men_AD   = sum(man)
+  )
+dplyr
+```
+Es sind vier Frauen und sieben Männer in der Leistungskategorie A bis D.
+
+```{r, echo=T}
+# Überprüfung auf Gleichheit
+identical(no_dplyr, dplyr)
+
+class(no_dplyr)
+class(dplyr)
+```
+- Ohne dplyr: "c" erzeugt einen Vektor. 
+- Mit dplyr: "summarise" erzeugt einen Dataframe.  
+Die Varianten sind nicht identsich auf Grund der unterschiedlichen Datentypen.
+
+## 2 a.5)
+```{r, echo=T}
+# Ohne dplyr:
+# Ermittelt die Anzahl Zeilen (nrow) für A oder C
+no_dplyr <- nrow(subset(best_running_results, achievement %in% c("A","C")))
+no_dplyr
+
+# Mit dplyr:
+dplyr <- best_running_results %>%
+  filter(achievement %in% c("A","C")) %>%
+  summarise(n = n())
+dplyr
+```
+```{r, echo=T}
+# Überprüfung auf Gleichheit
+identical(no_dplyr, dplyr)
+
+class(no_dplyr)
+class(dplyr)
+```
+- Ohne dplyr: "nrow" liefert einen einzelnen Integer.  
+- Mit dplyr: "summarise" erzeugt einen Dataframe.  
+Die Varianten sind nicht identsich auf Grund der unterschiedlichen Datentypen.
+
+## 2 b)
+```{r, echo=T}
+# Datensatz mit Split in Kategorien nach achievements unterteilen
+running_achievements <- split(best_running_results, 
+                              best_running_results$achievement)
+class(running_achievements)
+```
+Es resultiert eine Liste. Innerhalb der Liste wird nach den einzigartigen Kategorien in der 'achievement' Spalte gruppiert.
+
+## 2 c.1)
+```{r, echo=T}
+# Über sapply wird auf jedes Element die Funktion nrow angewendet
+sapply(running_achievements, nrow)
+
+```
+Es sind 2 personen in Kategorie A, 2 in B, 3 in C, 4 in D und 6 Kategorie E.
+
+## 2 c.2)
+```{r, echo=T}
+# Anzahl von Männern und Frauen in den jeweiligen Kategorien summieren
+sapply(running_achievements, function(df) {
+  c(men = sum(df$man), women = sum(df$woman))
+  })
+```
+In Kategorie A und B sind 2 Männer und keine Frau, in C 1 Mann und 2 Frauen, in D 2 Männer und 2 Frauen und in E 2 Männer und 4 Frauen.
+
+## 2 c.3)
+```{r, echo=T}
+# Berechnung der Mittelwerte der Spalte 'time' als Liste
+print("Die Mittlere Zeiten für die Kategorien sind:")
+lapply(running_achievements, function(df) {
+  mean(df$time)
+})
+```
+
+## 2 c.4)
+```{r, echo=T}
+# Filtern nach achievements = E und nur Frauen
+run_ach_fem_e <- 
+  running_achievements[["E"]]$time[running_achievements[["E"]]$woman == 1]
+
+# Median berechnen
+median(run_ach_fem_e)
+```
+Die durchschnittliche Zeit der Frauen aus Kategorie E ist 55,44 Min.
+
+## 2 d)
+```{r, echo=T}
+# Runden der Zeiten
+best_running_results$time <- round(best_running_results$time)
+
+# 2) Anzahl unterschiedlicher, gerundeter Zeiten über unique
+length(unique(best_running_results$time))
+```
+Es existieren 12 unterschiedliche Laufzeiten.
+
+# Aufgabe 3
+
+## 3 a)
+**1. Kürzere Syntax**
+Es kann durch ein Objekt wie mit einer for-Schleife iteriert werden, ohne umständlich lange Syntax zu schreiben. Die Codelänge kann reduziert werden. @dataquest_apply_functions
+
+**2. Output-Formatvorlagen**
+Über die apply Funktionen (wie lapply oder sapply) kann das Ergebnis direkt im gewünschten Format ausgegeben werden. @dataquest_apply_functions
+
+**3. Speicher-Effizienz**
+Ist häufig Speicher-Effizienter als for-Schleifen, was insbesondere bei großen Datensätzen von besonderer Bedeutung ist. @dataquest_apply_functions
+
+## 3 b)
+
+```{r, echo=T}
+# Performance-Messung
+microbenchmark(
+  for_loop = {
+    # Kategorien und Vektor anlegen
+    categories <- names(running_achievements)
+    res_for <- numeric(length(categories))
+    # Schleife initiieren
+    for (i in seq_along(categories)) {
+      cat <- categories[i]
+      res_for[i] <- mean(running_achievements[[cat]]$time)
+    }
+    
+  },
+  # Wie in 2 c.3) die lapply Funktion
+  apply_func = {
+    lapply(running_achievements, function(df) {
+      mean(df$time)
+    })
+  },
+  times = 1000  # Anzahl Wiederholungen
+)
+```
+Es ist ersichtlich, dass die lapply Funktion besser abschneidet, als die for-Schleife. sowohl im Mittel, als auch im Median ist die apply Funktion schneller als die Schleife. Dies könnte allerdings auch daran liegen, dass die Schleife semantisch nicht ideal (zeitoptimiert) umgesetzt ist.
+
+## 3 c)
+
+```{r, echo=T}
+l <- list(a = c(10:2), b = c(1:5), c = c(0, 1, 0))
+
+# Variante 1: lapply()
+res_lapply <- lapply(l, sum)
+res_lapply
+
+# Variante 2: sapply() ohne Vereinfachung
+res_sapply_no_simplify <- sapply(l, sum, simplify = FALSE)
+res_sapply_no_simplify
+
+# Variante 3: sapply() mit Vereinfachung
+res_sapply <- sapply(l, sum)
+res_sapply
+```
+Wenn bei sapply das Argument simplify=FALSE gesetzt wird, wird ebenfalls wie bei lapply eine Liste zurückgegeben. Durch weglassen des simplify Arguments würde, wie im dritten Beispiel gezeigt, ein Vektor statt einer Liste ausgegeben werden, da sapply immer versucht auf den einfachsten Datentyp zu konvertieren.
+
+# Aufgabe 4
+
+## 4 a)
+
+```{r, echo=T}
+air_Temp_C <- airquality %>%
+  filter(Month %in% c(7, 9), Temp >= 80) %>%
+  # Auswahl der Variablen
+  select(Solar.R, Wind, Temp, Month, Day) %>%
+  # Neue Spalte mit Temperatur in Grad Celsius
+  mutate(Temp_C = (Temp - 32) / (1.8)) %>%
+  # Sortieren absteigend nach Temp_C
+  arrange(desc(Temp_C))
+air_Temp_C
+```
+
+## 4 b)
+
+"air_Temp_C" enthält Daten aus airquality, bei denen der Monat weder Juli oder September ist und die Temperatur mindestens 80 Grad Fahrenheit beträgt. Es werden die Solarstrahlung, die Windgeschwindigkeit, die Temperatur, der Monat, der Tag und die berechnete Temperatur in Grad Celsius ausgegeben. 
+
+## 4 c)
+
+```{r, echo=T}
+# Filtern über Inklusion
+select(airquality, Solar.R, Wind, Temp, Month, Day)
+
+# Filtern über Exclusion
+select(airquality, -Ozone)
+```
+Über select können die Spalten aus dem Dataframe ausgewählt werden. Inklusion beschreibt hier die Explizite Auswahl der gewünschten Spalten und Exclusion der unerwünschten Spalten.
+
+
+## 4 d)
+
+"mutate" erzeugt neue Variablen, behält dabei aber die ereits bestehenden bei. Es sind nach der Anwednung die Originalspalten und die neuen Spalten vorhanden. "transmutate" hingegen erzeugt die neuen Variablen und nach der Anwednung ist nur noch die neue vorhanden.
+
+```{r, echo=T}
+# Mutate
+air_Temp_C %>%
+  mutate(Temp_C = (Temp - 32) / (1.8))
+
+# Transmutate
+air_Temp_C %>%
+  transmute(Temp_C = (Temp - 32) / (1.8))
+```
+
+# Aufgabe 5
+
+Das Paket ggplot2 folgt dem Konzept der „Grammar of Graphics“: Daten (z.B. Spalten eines Data Frames) werden auf visuelle Eigenschaften (sogenannte „Aesthetics“) abgebildet und dann mithilfe verschiedener Geoms (z.B. Punkte, Linien, Balken) dargestellt. So entsteht ein Plot als Abfolge von Schritten (Schichtenprinzip), bei dem z.B. definiert wird: „Nutze Spalte X als x-Achse, Spalte Y als y-Achse, verwende Punkte als Geom und färbe sie nach Spalte Z.“. 
+Die Syntax gibt vor, wie die Befehle (z.B. ggplot oder geom) geschrieben werden müssen, um korrekt ausgeführt zu werden. Die Semantik beschreibt, was im Hintergrund geschieht. Daten werden an geometrische Objekte gebunden und Ästhetiken bestimmen die Gestaltungsmerkmale der Geoms. Das Geom und die ästhetics werden über das "Layern" (Schichten) verknüpft, was über einen "+" Operator erfolgt. Dieses "Baukastenprinzip" ermöglicht eine schnelle und einfache Auswahl von gängigen Darstellungsmethoden. @Wickham2016
+
+# Aufgabe 6
+```{r, echo=T}
+airquality
+```
+
+
+## 6 a)
+```{r, echo=T}
+# Verwenden des Pipe-Operators, um den Datensatz in einem Schritt 
+# zu filtern, zu selektieren, zu mutieren und zu arrangieren
+air_season <- airquality %>%
+  # Filtern der Windgeschwindigkeiten zwischen 5 und 18 mph
+  filter(Wind >= 5 & Wind <= 18) %>%
+  # Entfernen der Spalten für Solarstrahlung und Ozongehalt
+  select(-Solar.R, -Ozone) %>%
+  # Hinzufügen einer neuen Spalte 'Season' basierend auf den Monaten
+  mutate(Season = case_when(
+    Month %in% c(3, 4, 5) ~ "Spring",
+    Month %in% c(6, 7, 8) ~ "Summer",
+    Month %in% c(9, 10, 11) ~ "Autumn",
+    Month %in% c(12, 1, 2) ~ "Winter"
+    ))
+
+# Ausgabe der ersten Zeilen des bearbeiteten Datensatzes
+head(air_season)
+```
+
+## 6 b)
+
+```{r, echo=T}
+# Sortierung der Spalte 'Season' für die gewünschte Reihenfolge in den Plots
+air_season$Season <- factor(air_season$Season, 
+                            levels = c("Spring", "Summer", "Autumn"))
+
+ggplot(data = air_season, aes(x = Temp, y = Wind))+ #Daten und Achsen wählen
+  geom_point() + # Datenpunkte setzen
+  facet_wrap(~ Season) + # Nach den distinct Values in 'Season' aufteilen
+  labs(x = "Temperature [°F]", 
+       y = "Windspeed [mph]") + # Achsen Beschriften
+  theme_grey() # Gewünschtes Schema wählen
+```
+
+## 6 c)
+
+```{r, echo=T}
+ggplot(data = air_season, aes(x = Temp, y = Wind, color = Month)) +
+  geom_point() +
+  facet_wrap(~ Season) +
+  #Farbwahl der Datenpunkte
+  scale_color_gradient(low="blue4", high="deepskyblue") + 
+  labs(x = "Temperature [°F]",
+       y = "Windspeed [mph]",
+       color = "Month") + # Legende für Month
+  theme_grey()
+
+```
+
+
+## 6 d)
+
+```{r, echo=T}
+ggplot(data = air_season, aes(x = Temp, y = Wind)) +
+  geom_point() +
+  # ncol=5, damit die einzelnen Plots nebeneinander aufgebaut werden
+  facet_wrap(~ Month, ncol = 5) + 
+  labs(x = "Temperature [°F]",
+       y = "Windspeed [mph]",
+       color = "Month") + # Legende für Month
+  theme_grey()
+
+```
+
+
+## 6 e)
+
+```{r, echo=T}
+ggplot(data = air_season, aes(x = Temp, y = Wind, color = Month)) +
+  geom_point() +
+  # nrow=3, damit die einzelnen Plots untereinander aufgebaut werden
+  facet_wrap(~ Season, nrow = 3) + 
+  scale_color_gradient(low="blue4", high="deepskyblue") + 
+  labs(x = "Temperature [°F]",
+       y = "Windspeed [mph]",
+       color = "Month") + # Legende für Month
+  theme_grey()
+
+```
+
+
+## 6 f)
+
+```{r, echo=T}
+# 'Month'-Spalte in Charakter umwandeln, damit sie diskret betrachtet werden
+air_season$Month <- as.character(air_season$Month)
+
+ggplot(data = air_season, aes(x = Temp, y = Wind, color = Month)) +
+  geom_point() +
+  facet_wrap(~ Season) +
+  #Farbwahl der Datenpunkte
+  scale_color_brewer(palette = "Blues") + 
+  labs(x = "Temperature [°F]",
+       y = "Windspeed [mph]",
+       color = "Month") +
+  theme_dark()
+
+```
+In den Aufgabenteilen 3c) und 3e) wird eine kontinuierliche Farbskala zur Darstellung der Monate verwendet. Dies ist jedoch nicht angemessen, da es sich bei Monaten um diskrete Kategorien handelt, nicht um kontinuierliche Werte. Eine kontinuierliche Farbskala vermittelt den Eindruck einer stufenlosen Veränderung, was für Monate nicht zutrifft.
+
+## 6 g)
+
+```{r, echo=T}
+ggplot(air_season) +
+  geom_point(mapping = aes(x = Temp, y = Wind)) + 
+  # lineare Regressionsgerade hinzufügen
+  geom_smooth(mapping = aes(x = Temp, y = Wind), 
+              method = "lm", color = "blue") +
+  facet_wrap(~Season, nrow = 3) +
+  labs(x = "Temperature [°F]",
+       y = "Windspeed [mph]")
+```
+
+## 6 h)
+
+Um Ausreißer zu identifizieren kann der Interquartilsabstand (IQR) hinzugezogen werden. Hierzu Wird ein Boxplot für die Windgeschwindigkeit erstellt. Der Boxplot zeigt den Median (dargestellt als Box) sowie den Bereich zwischen dem 25. Quartil-Box und von der Box bis zum 75. Quartil (auch "Whiskers" genannt). Als Ausreißer werden nun die Datenpunkte klassifiziert, welche weiter als 1,5x der IQR vom Median (jeweils in die Richtung des 25. und 75. Quartils) entfernt liegen. @IQR
+
+```{r, echo=T}
+# Boxplot für die Windgeschwindigkeit
+ggplot(data = airquality, aes(y = Wind)) +
+  geom_boxplot(outlier.color = "red") + # Ausreißer rot markieren
+  labs(title = "Boxplot der Windgeschwindigkeit",
+       x = "",
+       y = "Windspeed [mph]") +
+  theme_minimal()
+```
+Der Boxplot zeigt lediglich Ausreißer am "oberen" Ende. In der Berechnung werden somit keine Ausreißer unterhalb des unteren IQR erwartet.
+
+```{r, echo=T}
+# Quartile und IQR bestimmen
+Q1 <- quantile(airquality$Wind, 0.25, na.rm = TRUE)
+Q3 <- quantile(airquality$Wind, 0.75, na.rm = TRUE)
+IQR_value <- Q3 - Q1
+
+# Untere und obere Ausreißerschwelle bestimmen
+untere_grenze <- Q1 - 1.5 * IQR_value
+obere_grenze <- Q3 + 1.5 * IQR_value
+
+# Ausreißer filtern
+ausreißer <- airquality %>%
+  filter(Wind < untere_grenze | Wind > obere_grenze)
+ausreißer
+```
+Die Ausreißer in der Windgeschwindigkeit stimmen mit der Vermutung aus dem Boxplot überein, dass dieAusreißer nur über dem oberen IQR zu finden sind.
+
+## 6 i)
+```{r, echo=T}
+median(airquality$Solar.R[which(airquality$Wind <= 19.1 &
+                                  airquality$Month==6)])
+median(airquality$Solar.R[which(airquality$Wind <= 19.1 & 
+                                  airquality$Month==7)])
+median(airquality$Solar.R[which(airquality$Wind <= 19.1 & 
+                                  airquality$Month==9)])
+```
+## 6 i.1)
+
+```{r, echo=T}
+median(airquality$Solar.R[which(airquality$Wind <= 19.1 & 
+                                  airquality$Month==6)])
+median(airquality$Solar.R[which(airquality$Wind <= 19.1 & 
+                                  airquality$Month==7)])
+median(airquality$Solar.R[which(airquality$Wind <= 19.1 & 
+                                  airquality$Month==9)])
+```
+
+Der Code berechnet jeweils den Median der Spalte 'Solar.R' aus dem airquality Dataframe, bei denen Wind kleiner gleich 19,1 und der Monat entweder Juni (6), Juli (7) oder September (9) ist. Es wird also der Median der Solarstrahlung bei einer maximalen Windgeschwindigkeit von 19,1 mph für die jeweiligen monate ausgegeben. 
+
+
+## 6 i.2)
+
+```{r, echo=T}
+airquality %>%
+  # Filtern von Wind und Month
+  filter(Wind <= 19.1, Month %in% c(6, 7, 9)) %>% 
+  group_by(Month) %>% # Gruppieren nach Monaten 
+  # Mit summarise wird nach Gruppe eine Berechnung des Medians durchgeführt 
+  summarise(median_solar = median(Solar.R, na.rm = TRUE))
+```
+
+# Aufgabe 7
+
+## 7 a)
+
+Um eine fehlerfreie Berechnung der Regressionsgeraden zu ermöglichen, werden Zeilen mit fehlenden Werte in den relevanten Spalten entfernt. Um dann die Gerade zu erzeugen, müssen im ersten Schritt die Punkte erzeugt werden. Darauf kann mit lm() die Regressionsgerade der abhängigen Variablen (Temperatur) auf Basis der unabhängigen (Windgeschwindigkeit) geschätzt werden und mit abline() eingezeichnet werden.
+
+```{r, echo=T}
+# Nur Zeilen beibehalten, die in Temp und Wind vollständig sind
+air_sub <- airquality[complete.cases(airquality[, c("Temp", "Wind")]), ]
+
+# Scatter erzeugen
+plot(air_sub$Wind, air_sub$Temp,
+     xlab = "Windgeschwindigkeit (mph)",
+     ylab = "Temperatur (°F)",
+     pch = 20)
+
+# Lineare Regression schätzen
+model <- lm(Temp ~ Wind, data = air_sub)
+
+# Regressionsgerade einzeichnen
+abline(model, col = "blue")
+```
+
+
+## 7 b)
+
+Die Regressionsgerade entspringt ursprünglich aus der Geradenform y = m*x +b, mit
+y = Schätzer für Abhängige Variable
+m = Steigung der Geraden
+x = unabhängige Variable
+b = Y-Achsen-Abschnitt. @montgomery2021introduction
+Um die Regressionsgerade aus dem Modell aufstellen zu können wird sowohl der Y-Achsen-Abschnitt (b) als auch die Steigung der Geraden (m) benötigt. 
+
+
+```{r, echo=T}
+# Ausgabe der Koeffizienten 
+model
+```
+Diese Koeffizienten können nun in die Regressionsgleichung eingesetzt werden.
+
+$$ Temperaturschätzer = -1.23 \cdot x + 90.13 $$
+# Aufgabe 8
+
+## 8 a)
+
+```{r, echo=T}
+best_running_results <- 
+  data.frame("runnerName" = c("A.B.", "A.D.", "B.E.", 
+                              "B.Z.", "C.E.", "G.L.", 
+                              "G.S.", "M.E.", "M.M.", 
+                              "M.N.", "S.S.", "S.L.", 
+                              "T.A.", "T.Al.", "T.R.", 
+                              "U.B.", "V.U."),
+             "time" = c(41.20, 46.18, 44.20, 43.45, 46.42, 
+                        48.45, 51.13, 41.54, 54.44, 56.44,
+                        57.01, 47.56, 51.15, 49.32, 48.12,
+                        50.49, 51.20),
+             "man" = c(1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1,
+                       0, 1, 1, 0, 1),
+             "woman" = c(0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 
+                         0, 1, 0, 0, 1, 0))
+best_running_results
+
+best_running_results <- best_running_results %>%
+  mutate( # hinzufügen der achievement Spalte
+    achievement = case_when(
+      time <= 42 ~ "A",  # A, wenn time <= 42 min
+      time > 42  & time <= 45 ~ "B",  # A, wenn time > 42 min & <= 45 min
+      time > 45  & time <= 48 ~ "C",  # A, wenn time > 45 min & <= 48 min
+      time > 48  & time <= 51 ~ "D",  # A, wenn time > 48 min & <= 51 min
+      time > 51  ~ "E"   # A, wenn time > 51 min
+    )
+  )
+
+best_running_results
+```
+
+## 8 b)
+
+```{r, echo=T}
+# Falls 'woman' == 1, setze Geschlecht auf 'Frau', sonst auf 'Mann'.
+best_running_results <- best_running_results %>%
+  mutate(
+    Geschlecht = if_else(woman == 1, "Frau", "Mann")
+  )
+
+# 2) Boxplot erstellen:
+ggplot(best_running_results, aes(x = Geschlecht, y = time)) +
+  geom_boxplot() +
+  labs(
+    title = "Boxplots der 17 schnellsten 10km-Laufzeiten nach Geschlecht",
+    x = "Geschlecht",
+    y = "Laufzeit [min]"
+  ) +
+  theme_grey()
+```
+
+
