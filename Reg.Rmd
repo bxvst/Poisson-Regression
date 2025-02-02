@@ -2,15 +2,15 @@
 title: "Programmierung für Statistische Datenanalyse - Poisson-Regression"
 # abstract: "A brief summary of our ideas."
 # keywords: "Statistics, Regression, Forecasting"
-course: Programmierung für Statistische Datenanalyse (Prof. Dr. Buchwitz)
-supervisor: Prof. Dr. Buchwitz
+course: Programmierung für Statistische Datenanalyse 
+supervisor: 
 city: Meschede
 author:
-- familyname: Baars
+- familyname: 
   othernames: Louis
-  address: "MatNr: 30447121"
+  address: "MatNr: "
   qualifications: "Data Science (M. Sc., 1. Semester)"
-  email: baars.louis@fh-swf.de
+  email: 
 german: true # German Dummy Text
 lang: de-de   # Text Language: en-gb, en-us, de-de
 toc: true     # Table of Contents
