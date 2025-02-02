@@ -1,0 +1,187 @@
+---
+title: "Programmierung für Statistische Datenanalyse - Poisson-Regression"
+# abstract: "A brief summary of our ideas."
+# keywords: "Statistics, Regression, Forecasting"
+course: Programmierung für Statistische Datenanalyse (Prof. Dr. Buchwitz)
+supervisor: Prof. Dr. Buchwitz
+city: Meschede
+author:
+- familyname: Baars
+  othernames: Louis
+  address: "MatNr: 30447121"
+  qualifications: "Data Science (M. Sc., 1. Semester)"
+  email: baars.louis@fh-swf.de
+german: true # German Dummy Text
+lang: de-de   # Text Language: en-gb, en-us, de-de
+toc: true     # Table of Contents
+lot: false    # List of Tables
+lof: false    # List of Figures
+bibliography: references.bib
+biblio-style: authoryear-comp
+blind: false
+cover: true
+checklist: false
+output:
+  fhswf::seminarpaper:
+    fig_caption: yes
+    fig_height: 5
+    fig_width: 8
+    keep_tex: no
+    number_sections: yes
+    citation_package: biblatex
+knit: fhswf::render_seminarpaper
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache=FALSE, messages=FALSE, warning=FALSE, 
+                      attr.source='.numberLines', singlespacing = TRUE)
+fhswf::fhswf_hooks()
+
+# Load Packages
+library(fhswf)
+library(ggplot2)
+library(dplyr)
+```
+
+# Poisson-Regression
+
+```{r, echo=T}
+# Poisson-Regression mit dem fdeaths-Datensatz
+# In diesem Skript werden die monatlichen Todesfälle (fdeaths) in ein DataFrame 
+# umgewandelt, nach Monaten (Jan-Sept) gefiltert, als Kontingenztabelle abgebildet 
+# und schließlich in einer Poisson-Regression (manuell vs. glm) analysiert.
+
+# Daten laden
+# https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/00Index.html
+data <- fdeaths
+data <- data.frame(
+  Month  = rep(1:12, times = length(time(data)) / 12),  # Monate numerisch 1-12
+  Year   = rep(unique(floor(time(data))), each = 12),   # passendes Jahr 
+  Deaths = as.numeric(data)                             # fdeaths-Werte als Zahlen
+)
+
+# Nur Monate 1-9 behalten
+data_filtered <- subset(data, Month <= 9)
+
+# Kontingenztabelle erstellen (Year x Month) und Summenzeilen/spalten
+contingency_table <- xtabs(Deaths ~ Year + Month, data = data_filtered)
+contingency_table_with_sums <- addmargins(contingency_table)
+contingency_table_with_sums
+
+# Plot zur Übersicht
+# - Einmal ungefiltert (Monate 1-12)
+# - Einmal gefiltert (Monate 1-9)
+
+ggplot(data, aes(x = Month, y = Deaths, group = Year, color = as.factor(Year))) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 1:12) +
+  labs(
+    title = "Monatliche Todesfälle durch Lungenkrankheiten (Jan - Dez)",
+    x = "Monat",
+    y = "Todesfälle",
+    color = "Jahr"
+  ) +
+  theme_minimal()
+
+ggplot(data_filtered, aes(x = Month, y = Deaths, group = Year, color = as.factor(Year))) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 1:9) +
+  labs(
+    title = "Monatliche Todesfälle durch Lungenkrankheiten (Jan - Sep)",
+    x = "Monat",
+    y = "Todesfälle",
+    color = "Jahr"
+  ) +
+  theme_minimal()
+
+## Poisson-Regression
+
+# Todesfälle nach Monat und Jahr summieren (Jan-Sept)
+df_agg <- aggregate(Deaths ~ Month + Year, data = data_filtered, FUN = sum)
+
+# Monat und Jahr zu Faktoren machen (für Poisson-Regression)
+df_agg$MonthFactor <- factor(df_agg$Month)
+df_agg$YearFactor  <- factor(df_agg$Year)
+
+# Manuelle Erstellung der Designmatrix (Deaths ~ MonthFactor + YearFactor)
+
+n <- nrow(df_agg)     # Anzahl Beobachtungen
+
+# Intercept-Spalte (nur 1en)
+X <- matrix(1, nrow = n, ncol = 1)
+colnames(X) <- "Intercept"
+
+# Dummy-Spalten für MonthFactor (Referenz: Month=1)
+# Die Variable "MonthFactor" ist ein Faktor mit mehreren Stufen (1, 2, 3, ...)
+# Im folgenden werden die Faktoren in Zahlen umgewandelt:
+# month_codes[i] = j, falls die i-te Zeile im j-ten Faktorlevel liegt
+month_codes <- as.integer(df_agg$MonthFactor)
+
+# Wir erstellen nun für jeden Month-Level (außer dem 1.) eine Dummy-Spalte
+# Jede Spalte bekommt eine 1, wenn der jeweilige Datensatz in diesem Level liegt,
+# und 0 sonst. Damit ist der Level "Month=1" implizit im Intercept enthalten (Referenzlevel)
+for (j in 2:length(levels(df_agg$MonthFactor))) {
+  # Erzeuge die 0/1-Spalte
+  dummy_col <- as.numeric(month_codes == j)
+  # Hänge sie an die bestehende Matrix X an
+  X <- cbind(X, dummy_col)
+  # Bennene die Spalte eindeutig, z.B. "Month2", "Month3" usw.
+  colnames(X)[ncol(X)] <- paste0("Month", j)
+}
+
+# Dummy-Spalten für YearFactor (Referenz: kleinstes Year)
+# Das gleiche Prinzip für die Jahresvariable. Wieder ist das erste Level (Jahr=1974)
+# die Referenz. Für jedes weitere Level wird eine neue Spalte angelegt
+year_codes <- as.integer(df_agg$YearFactor)
+for (j in 2:length(levels(df_agg$YearFactor))) {
+  dummy_col <- as.numeric(year_codes == j)
+  X <- cbind(X, dummy_col)
+  # Spalte entsprechend benennen, z.B. "Year2", "Year3" usw.
+  colnames(X)[ncol(X)] <- paste0("Year", j)
+}
+
+# Zielvariable (Zähldaten)
+y <- df_agg$Deaths
+
+# Negative Log-Likelihood-Funktion für Poisson
+pois <- function(par, X, y) {
+  lambda <- exp(X %*% par)            # e^(X * beta)
+  
+  # Manuelle Berechnung der Log-Wahrscheinlichkeit:
+  # log(P(Y = y)) = -lambda + y * log(lambda) - log(y!)
+  # lgamma, da log(y!) = lgamma(y + 1)
+  log_likelihood <- -lambda + y * log(lambda) - lgamma(y + 1)
+  
+  # Negative Log-Likelihood: 
+  # Summe über alle Beobachtungen und Negierung
+  return(-sum(log_likelihood))
+}
+
+# Schätzung der Parameter mit optim 
+# Genauere Erklärung zur Funktionsweise befindet sich  auf dem Poster
+start_vals <- rep(0, ncol(X))
+fit_manual <- optim(
+  par    = start_vals,
+  fn     = pois,
+  X      = X,
+  y      = y,
+  method = "BFGS"
+)
+manual_coef <- fit_manual$par
+#manual_coef
+
+# glm initialisierien (Poisson)
+fit_glm <- glm(Deaths ~ MonthFactor + YearFactor, data = df_agg, family = poisson())
+glm_coef <- coef(fit_glm)
+
+# Gegenüberstellung
+cbind("Manuell" = manual_coef, "GLM" = glm_coef)
+
+```
+
